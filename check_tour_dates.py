@@ -5,6 +5,7 @@ import os
 import json
 import smtplib
 import re
+import urllib.parse
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from datetime import datetime
@@ -40,58 +41,18 @@ def extract_us_dates(html_content):
     Returns:
         list: A list of tour date dictionaries with keys: 'date', 'city', 'venue', 'address'
     """
-    soup = BeautifulSoup(html_content, 'html.parser')
-
-    us_dates = []
-
-    # Find all event cards - match by class name (any tag), fallback to text-container
-    events = soup.find_all(class_='card-date-reveal')
-    if not events:
-        events = soup.find_all(class_='text-container')
-
-    for event in events:
-        try:
-            # match date/city/venue by class (tag may be <p> or <span>)
-            date_text = event.find(class_='date')
-            city_text = event.find(class_='city')
-            venue_text = event.find(class_='venue')
-
-            # The address is in a hidden dialog, but it's already in the HTML
-            # Find the dialog associated with this event
-            address_link = None
-            parent = event.find_parent()
-            if parent:
-                address_link = parent.find('a', class_='address')
-
-            if not address_link:
-                # Try finding the dialog directly on the page
-                dialog = soup.find('dialog', {'data-modal': 'date-infos'})
-                if dialog:
-                    address_link = dialog.find('a', class_='address')
-
-            if date_text and city_text:
-                address_text = address_link.get_text(strip=True) if address_link else "Address not found"
-
-                event_data = {
-                    'date': date_text.get_text(strip=True),
-                    'city': city_text.get_text(strip=True),
-                    'venue': venue_text.get_text(strip=True) if venue_text else 'TBA',
-                    'address': address_text
-                }
-
-                # Check if this event is in the US by detecting US postal code in the address
-                if is_us_location_by_postal_code(address_text):
-                    us_dates.append(event_data)
-        except Exception as e:
-            print(f"Error parsing event: {e}")
-            continue
-
+    # Use the same extraction logic as extract_all_events, then filter for US dates
+    all_events = extract_all_events(html_content)
+    us_dates = [e for e in all_events if is_us_location_by_postal_code(e.get('address', ''))]
     return us_dates
 
 
 def extract_all_events(html_content):
     """
     Parse the HTML and extract all tour events (no country filtering).
+    
+    The address data is stored in a data-infos attribute as URL-encoded JSON.
+    We decode and parse it to get the full event details.
 
     Returns:
         list: A list of tour event dictionaries with keys: 'date', 'city', 'venue', 'address'
@@ -99,51 +60,64 @@ def extract_all_events(html_content):
     soup = BeautifulSoup(html_content, 'html.parser')
     events_out = []
 
-    # Find all event cards - match by class name (any tag), fallback to text-container
-    events = soup.find_all(class_='card-date-reveal')
-    if not events:
-        events = soup.find_all(class_='text-container')
-
-    # Find dialog address if present
-    dialog = soup.find('dialog', {'data-modal': 'date-infos'})
-    dialog_address = None
-    if dialog:
-        addr_el = dialog.find('a', class_='address')
-        dialog_address = addr_el.get_text(strip=True) if addr_el else None
+    # Find all event cards by the actual class name
+    events = soup.find_all('div', class_='card-date')
 
     for event in events:
         try:
-            date_text = event.find(class_='date')
-            city_text = event.find(class_='city')
-            venue_text = event.find(class_='venue')
+            # Find the text container with event details
+            text_container = event.find('div', class_='text-container')
+            if not text_container:
+                continue
 
-            # Try to locate an address near this event; fallback to dialog address if present
-            address_text = None
-            # search for an address link inside parent or nearby elements
-            parent = event.find_parent()
-            if parent:
-                addr = parent.find('a', class_='address')
-                if addr:
-                    address_text = addr.get_text(strip=True)
+            # Get date and venue from top-info
+            top_info = text_container.find('div', class_='top-info')
+            if not top_info:
+                continue
+            
+            date_elem = top_info.find('span', class_='date')
+            venue_elem = top_info.find('span', class_='venue')
+            
+            # Get city from middle-info
+            middle_info = text_container.find('div', class_='middle-info')
+            city_elem = None
+            if middle_info:
+                city_elem = middle_info.find('div', class_='city')
 
-            if not address_text:
-                # try searching nearby siblings
-                sibling_addr = event.find_next('a', class_='address')
-                if sibling_addr:
-                    address_text = sibling_addr.get_text(strip=True)
+            if not date_elem or not city_elem:
+                continue
 
-            if not address_text and dialog_address:
-                address_text = dialog_address
+            # Extract date and city
+            date_text = date_elem.get_text(strip=True)
+            city_text = city_elem.get_text(strip=True)
+            venue_text = venue_elem.get_text(strip=True) if venue_elem else 'TBA'
 
-            if date_text and city_text:
-                events_out.append({
-                    'date': date_text.get_text(strip=True),
-                    'city': city_text.get_text(strip=True),
-                    'venue': venue_text.get_text(strip=True) if venue_text else 'TBA',
-                    'address': address_text or ''
-                })
+            # Get address from the data-infos attribute on the "More info" button
+            address_text = ''
+            bottom_infos = text_container.find('div', class_='bottom-infos')
+            if bottom_infos:
+                more_info_btn = bottom_infos.find('button', {'data-open-modal': 'date-infos'})
+                if more_info_btn and more_info_btn.has_attr('data-infos'):
+                    try:
+                        # Decode the URL-encoded JSON
+                        encoded_data = more_info_btn['data-infos']
+                        decoded_data = urllib.parse.unquote(encoded_data)
+                        event_info = json.loads(decoded_data)
+                        address_text = event_info.get('address', '')
+                    except Exception as e:
+                        print(f"Error decoding event info: {e}")
+                        address_text = ''
+
+            # Create event dictionary
+            events_out.append({
+                'date': date_text,
+                'city': city_text,
+                'venue': venue_text,
+                'address': address_text
+            })
+
         except Exception as e:
-            print(f"Error parsing event for all-events: {e}")
+            print(f"Error parsing event: {e}")
             continue
 
     return events_out
