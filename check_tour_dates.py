@@ -457,11 +457,19 @@ def main():
     # TESTING: if FORCE_SEND_FIRST is set, send the first event found (useful for GitHub Actions tests)
     if os.getenv('FORCE_SEND_FIRST') == '1':
         if all_events:
-            print('DEBUG: FORCE_SEND_FIRST enabled — sending first event via email')
+            print('DEBUG: FORCE_SEND_FIRST enabled — sending first event via all channels')
             try:
                 send_email_notification([all_events[0]])
             except Exception as e:
                 print(f"Error sending forced test email: {e}")
+            try:
+                send_sms_via_email([all_events[0]])
+            except Exception as e:
+                print(f"Error in forced SMS: {e}")
+            try:
+                send_telegram_notification([all_events[0]])
+            except Exception as e:
+                print(f"Error in forced Telegram: {e}")
         else:
             print('DEBUG: FORCE_SEND_FIRST enabled but no events found')
         return
