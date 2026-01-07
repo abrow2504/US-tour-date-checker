@@ -196,15 +196,53 @@ def extract_all_events(html_content):
     return events_out
 
 
+def get_us_states_map():
+    """
+    Returns a mapping of US state abbreviations and full names for fallback matching.
+    
+    Returns:
+        dict: Map of state abbreviations to full names, and full names to abbreviations
+    """
+    state_abbr_to_name = {
+        'AL': 'Alabama', 'AK': 'Alaska', 'AZ': 'Arizona', 'AR': 'Arkansas',
+        'CA': 'California', 'CO': 'Colorado', 'CT': 'Connecticut', 'DE': 'Delaware',
+        'FL': 'Florida', 'GA': 'Georgia', 'HI': 'Hawaii', 'ID': 'Idaho',
+        'IL': 'Illinois', 'IN': 'Indiana', 'IA': 'Iowa', 'KS': 'Kansas',
+        'KY': 'Kentucky', 'LA': 'Louisiana', 'ME': 'Maine', 'MD': 'Maryland',
+        'MA': 'Massachusetts', 'MI': 'Michigan', 'MN': 'Minnesota', 'MS': 'Mississippi',
+        'MO': 'Missouri', 'MT': 'Montana', 'NE': 'Nebraska', 'NV': 'Nevada',
+        'NH': 'New Hampshire', 'NJ': 'New Jersey', 'NM': 'New Mexico', 'NY': 'New York',
+        'NC': 'North Carolina', 'ND': 'North Dakota', 'OH': 'Ohio', 'OK': 'Oklahoma',
+        'OR': 'Oregon', 'PA': 'Pennsylvania', 'RI': 'Rhode Island', 'SC': 'South Carolina',
+        'SD': 'South Dakota', 'TN': 'Tennessee', 'TX': 'Texas', 'UT': 'Utah',
+        'VT': 'Vermont', 'VA': 'Virginia', 'WA': 'Washington', 'WV': 'West Virginia',
+        'WI': 'Wisconsin', 'WY': 'Wyoming',
+        'DC': 'District of Columbia'
+    }
+    
+    # Also create name to abbreviation mapping for fallback checking
+    state_name_to_abbr = {v.upper(): k for k, v in state_abbr_to_name.items()}
+    
+    return {
+        'abbr_to_name': state_abbr_to_name,
+        'name_to_abbr': state_name_to_abbr,
+        'all_abbrs': set(state_abbr_to_name.keys()),
+        'all_names': set(state_abbr_to_name.values())
+    }
+
+
 def is_us_location_by_postal_code(address_text):
     """
     Detect if an address is in the US by looking for the US postal code format:
     State abbreviation (2 capital letters) followed by 5-digit ZIP code.
+    Falls back to checking for US state names/abbreviations if no postal code found.
     
     Examples:
     - "New York, NY 10001" → matches (state abbr + ZIP)
     - "Los Angeles, CA 90210" → matches
-    - "1 Pl. Saint-Nazaire, 11000 Carcassonne" → does NOT match (just 5 digits, no state)
+    - "New York, NY" → matches (fallback: state abbreviation alone)
+    - "New York City" → matches (fallback: state name alone)
+    - "1 Pl. Saint-Nazaire, 11000 Carcassonne" → does NOT match (European address)
     
     This distinguishes US addresses from European ones, which just have postal codes
     without state abbreviations.
@@ -213,9 +251,9 @@ def is_us_location_by_postal_code(address_text):
         address_text (str): The full address string
         
     Returns:
-        bool: True if the address contains a US state + ZIP code pattern
+        bool: True if the address contains a US state + ZIP code pattern, or fallback matches
     """
-    # Pattern: space/comma, then 2 uppercase letters (state), space, then 5 digits (ZIP)
+    # Primary: Pattern for state abbreviation + ZIP code
     # Examples: "NY 10001", "CA 90210-1234", "Texas TX 12345"
     us_pattern = r'[,\s]([A-Z]{2})\s+\d{5}(?:-\d{4})?'
     
@@ -226,6 +264,23 @@ def is_us_location_by_postal_code(address_text):
         state_abbr = match.group(1)
         print(f"DEBUG: Found US postal pattern with state '{state_abbr}' in address: {address_text}")
         return True
+    
+    # Fallback: Check for state abbreviations or names directly
+    states_map = get_us_states_map()
+    address_upper = address_text.upper()
+    
+    # Check for state abbreviations (like "NY", "CA", "TX")
+    for abbr in states_map['all_abbrs']:
+        # Use word boundaries to avoid matching partial words
+        if re.search(rf'\b{abbr}\b', address_upper):
+            print(f"DEBUG: Found US state abbreviation '{abbr}' (fallback) in address: {address_text}")
+            return True
+    
+    # Check for state names (like "New York", "California", "Texas")
+    for name in states_map['all_names']:
+        if re.search(rf'\b{name.upper()}\b', address_upper):
+            print(f"DEBUG: Found US state name '{name}' (fallback) in address: {address_text}")
+            return True
     
     return False
 
