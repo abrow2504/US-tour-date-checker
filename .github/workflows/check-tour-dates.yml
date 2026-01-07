@@ -43,6 +43,7 @@ jobs:
           EMAIL_ADDRESS: ${{ secrets.EMAIL_ADDRESS }}
           EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
           RECIPIENT_EMAIL: ${{ secrets.RECIPIENT_EMAIL }}
+          FORCE_SEND_FIRST: ${{ secrets.FORCE_SEND_FIRST }}
         run: python check_tour_dates.py
       
       # Step 5: Commit and push updated state file
