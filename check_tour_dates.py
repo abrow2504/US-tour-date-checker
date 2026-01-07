@@ -41,50 +41,51 @@ def extract_us_dates(html_content):
         list: A list of tour date dictionaries with keys: 'date', 'city', 'venue', 'address'
     """
     soup = BeautifulSoup(html_content, 'html.parser')
-    
+
     us_dates = []
-    
-    # Find all event cards - they're in elements with class 'card-date-reveal' or inside 'text-container'
-        events = soup.find_all(class_='card-date-reveal')
-    
-    # If card-date-reveal isn't found, try finding text-container elements
+
+    # Find all event cards - match by class name (any tag), fallback to text-container
+    events = soup.find_all(class_='card-date-reveal')
     if not events:
-            events = soup.find_all(class_='text-container')
-    
+        events = soup.find_all(class_='text-container')
+
     for event in events:
         try:
-            # Extract event information from the visible card
-                date_text = event.find(class_='date')
-                city_text = event.find(class_='city')
-                venue_text = event.find(class_='venue')
-            
+            # match date/city/venue by class (tag may be <p> or <span>)
+            date_text = event.find(class_='date')
+            city_text = event.find(class_='city')
+            venue_text = event.find(class_='venue')
+
             # The address is in a hidden dialog, but it's already in the HTML
             # Find the dialog associated with this event
-                address_link = event.find_parent().find('a', class_='address')
-            
+            address_link = None
+            parent = event.find_parent()
+            if parent:
+                address_link = parent.find('a', class_='address')
+
             if not address_link:
                 # Try finding the dialog directly on the page
                 dialog = soup.find('dialog', {'data-modal': 'date-infos'})
                 if dialog:
                     address_link = dialog.find('a', class_='address')
-            
+
             if date_text and city_text:
-                    address_text = address_link.get_text(strip=True) if address_link else "Address not found"
-                
+                address_text = address_link.get_text(strip=True) if address_link else "Address not found"
+
                 event_data = {
                     'date': date_text.get_text(strip=True),
                     'city': city_text.get_text(strip=True),
                     'venue': venue_text.get_text(strip=True) if venue_text else 'TBA',
                     'address': address_text
                 }
-                
+
                 # Check if this event is in the US by detecting US postal code in the address
                 if is_us_location_by_postal_code(address_text):
                     us_dates.append(event_data)
         except Exception as e:
             print(f"Error parsing event: {e}")
             continue
-    
+
     return us_dates
 
 
@@ -98,10 +99,10 @@ def extract_all_events(html_content):
     soup = BeautifulSoup(html_content, 'html.parser')
     events_out = []
 
-    # Find all event cards - they're in elements with class 'card-date-reveal' or inside 'text-container'
-        events = soup.find_all(class_='card-date-reveal')
+    # Find all event cards - match by class name (any tag), fallback to text-container
+    events = soup.find_all(class_='card-date-reveal')
     if not events:
-            events = soup.find_all(class_='text-container')
+        events = soup.find_all(class_='text-container')
 
     # Find dialog address if present
     dialog = soup.find('dialog', {'data-modal': 'date-infos'})
@@ -112,18 +113,24 @@ def extract_all_events(html_content):
 
     for event in events:
         try:
-                date_text = event.find(class_='date')
-                city_text = event.find(class_='city')
-                venue_text = event.find(class_='venue')
+            date_text = event.find(class_='date')
+            city_text = event.find(class_='city')
+            venue_text = event.find(class_='venue')
 
             # Try to locate an address near this event; fallback to dialog address if present
             address_text = None
             # search for an address link inside parent or nearby elements
             parent = event.find_parent()
             if parent:
-                    addr = parent.find('a', class_='address')
+                addr = parent.find('a', class_='address')
                 if addr:
                     address_text = addr.get_text(strip=True)
+
+            if not address_text:
+                # try searching nearby siblings
+                sibling_addr = event.find_next('a', class_='address')
+                if sibling_addr:
+                    address_text = sibling_addr.get_text(strip=True)
 
             if not address_text and dialog_address:
                 address_text = dialog_address
