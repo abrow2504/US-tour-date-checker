@@ -316,17 +316,19 @@ def send_email_notification(new_dates):
         msg['From'] = sender_email
         msg['To'] = recipient_email
         
+        # Base site URL fallback (can be overridden with env SITE_URL)
+        base_site = os.getenv('SITE_URL', 'https://apaintedsymphony.expedition33.com/')
+
         # Create plain text and HTML versions (include event link if available)
         text = "New US tour dates have been found!\n\n"
         html = "<html><body><h2>🎵 New US Tour Dates!</h2><table border='1'><tr><th>Date</th><th>City</th><th>Venue</th><th>Link</th></tr>"
 
         for date_info in new_dates:
             link = date_info.get('link') or ''
+            if not link:
+                link = base_site
             text += f"- {date_info['date']}: {date_info['city']} at {date_info['venue']} {link}\n"
-            if link:
-                html += f"<tr><td>{date_info['date']}</td><td>{date_info['city']}</td><td>{date_info['venue']}</td><td><a href=\"{link}\">Link</a></td></tr>"
-            else:
-                html += f"<tr><td>{date_info['date']}</td><td>{date_info['city']}</td><td>{date_info['venue']}</td><td></td></tr>"
+            html += f"<tr><td>{date_info['date']}</td><td>{date_info['city']}</td><td>{date_info['venue']}</td><td><a href=\"{link}\">Link</a></td></tr>"
 
         html += "</table></body></html>"
         
