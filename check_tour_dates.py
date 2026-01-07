@@ -45,22 +45,22 @@ def extract_us_dates(html_content):
     us_dates = []
     
     # Find all event cards - they're in elements with class 'card-date-reveal' or inside 'text-container'
-    events = soup.find_all('div', class_='card-date-reveal')
+        events = soup.find_all(class_='card-date-reveal')
     
     # If card-date-reveal isn't found, try finding text-container elements
     if not events:
-        events = soup.find_all('div', class_='text-container')
+            events = soup.find_all(class_='text-container')
     
     for event in events:
         try:
             # Extract event information from the visible card
-            date_text = event.find('span', class_='date')
-            city_text = event.find('span', class_='city')
-            venue_text = event.find('span', class_='venue')
+                date_text = event.find(class_='date')
+                city_text = event.find(class_='city')
+                venue_text = event.find(class_='venue')
             
             # The address is in a hidden dialog, but it's already in the HTML
             # Find the dialog associated with this event
-            address_link = event.find_parent().find('a', class_='address')
+                address_link = event.find_parent().find('a', class_='address')
             
             if not address_link:
                 # Try finding the dialog directly on the page
@@ -69,7 +69,7 @@ def extract_us_dates(html_content):
                     address_link = dialog.find('a', class_='address')
             
             if date_text and city_text:
-                address_text = address_link.get_text(strip=True) if address_link else "Address not found"
+                    address_text = address_link.get_text(strip=True) if address_link else "Address not found"
                 
                 event_data = {
                     'date': date_text.get_text(strip=True),
@@ -99,9 +99,9 @@ def extract_all_events(html_content):
     events_out = []
 
     # Find all event cards - they're in elements with class 'card-date-reveal' or inside 'text-container'
-    events = soup.find_all('div', class_='card-date-reveal')
+        events = soup.find_all(class_='card-date-reveal')
     if not events:
-        events = soup.find_all('div', class_='text-container')
+            events = soup.find_all(class_='text-container')
 
     # Find dialog address if present
     dialog = soup.find('dialog', {'data-modal': 'date-infos'})
@@ -112,16 +112,16 @@ def extract_all_events(html_content):
 
     for event in events:
         try:
-            date_text = event.find('span', class_='date')
-            city_text = event.find('span', class_='city')
-            venue_text = event.find('span', class_='venue')
+                date_text = event.find(class_='date')
+                city_text = event.find(class_='city')
+                venue_text = event.find(class_='venue')
 
             # Try to locate an address near this event; fallback to dialog address if present
             address_text = None
             # search for an address link inside parent or nearby elements
             parent = event.find_parent()
             if parent:
-                addr = parent.find('a', class_='address')
+                    addr = parent.find('a', class_='address')
                 if addr:
                     address_text = addr.get_text(strip=True)
 
