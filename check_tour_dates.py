@@ -11,27 +11,56 @@ from email.mime.multipart import MIMEMultipart
 from datetime import datetime
 import requests
 from bs4 import BeautifulSoup
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.chrome.options import Options
 
 
 def fetch_website():
     """
-    Fetch the concert website and return the HTML content.
+    Fetch the concert website using Selenium (headless browser) to render JavaScript.
     
     Returns:
-        str: The HTML content of the webpage, or None if request fails
+        str: The HTML content of the webpage after JavaScript is executed, or None if request fails
     """
     url = "https://apaintedsymphony.expedition33.com/"
     
     try:
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-        }
-        response = requests.get(url, headers=headers, timeout=10)
-        response.raise_for_status()  # Raise an error if the request failed
-        print(f"DEBUG: Fetched {len(response.text)} characters from website")
-        return response.text
-    except requests.RequestException as e:
-        print(f"Error fetching website: {e}")
+        # Set up Chrome options for headless mode
+        chrome_options = Options()
+        chrome_options.add_argument("--headless")  # Run in background
+        chrome_options.add_argument("--no-sandbox")  # Required for GitHub Actions
+        chrome_options.add_argument("--disable-dev-shm-usage")  # Overcome limited resource problems
+        chrome_options.add_argument("--disable-blink-features=AutomationControlled")  # Hide automation
+        
+        # Create driver
+        driver = webdriver.Chrome(options=chrome_options)
+        
+        print(f"DEBUG: Fetching {url} with Selenium...")
+        driver.get(url)
+        
+        # Wait for the dates list to load (max 10 seconds)
+        print("DEBUG: Waiting for dates to load...")
+        WebDriverWait(driver, 10).until(
+            EC.presence_of_all_elements_located((By.CLASS_NAME, "card-date"))
+        )
+        print("DEBUG: Dates loaded!")
+        
+        # Get the rendered HTML
+        html = driver.page_source
+        print(f"DEBUG: Fetched {len(html)} characters from website")
+        
+        driver.quit()
+        return html
+        
+    except Exception as e:
+        print(f"Error fetching website with Selenium: {e}")
+        try:
+            driver.quit()
+        except:
+            pass
         return None
 
 
