@@ -150,10 +150,16 @@ def extract_all_events(html_content):
             city_text = city_elem.get_text(strip=True)
             venue_text = venue_elem.get_text(strip=True) if venue_elem else 'TBA'
 
-            # Get address from the data-infos attribute on the "More info" button
+            # Get address and link from the data-infos attribute on the "More info" button
             address_text = ''
+            link_text = ''
             bottom_infos = text_container.find('div', class_='bottom-infos')
             if bottom_infos:
+                # try to find a direct tickets link first
+                tickets_a = bottom_infos.find('a', class_='btn')
+                if tickets_a and tickets_a.has_attr('href'):
+                    link_text = tickets_a['href']
+
                 more_info_btn = bottom_infos.find('button', {'data-open-modal': 'date-infos'})
                 if more_info_btn and more_info_btn.has_attr('data-infos'):
                     try:
@@ -162,16 +168,24 @@ def extract_all_events(html_content):
                         decoded_data = urllib.parse.unquote(encoded_data)
                         event_info = json.loads(decoded_data)
                         address_text = event_info.get('address', '')
+                        # prefer link from embedded JSON if present
+                        link_text = event_info.get('link', link_text)
                     except Exception as e:
                         print(f"Error decoding event info for event {idx}: {e}")
                         address_text = ''
+                else:
+                    # fallback: look for primary ticket anchor
+                    a_primary = bottom_infos.find('a', class_='btn primary')
+                    if a_primary and a_primary.has_attr('href'):
+                        link_text = a_primary['href']
 
             # Create event dictionary
             events_out.append({
                 'date': date_text,
                 'city': city_text,
                 'venue': venue_text,
-                'address': address_text
+                'address': address_text,
+                'link': link_text
             })
             print(f"DEBUG: Extracted event {idx}: {city_text} on {date_text}")
 
@@ -302,14 +316,18 @@ def send_email_notification(new_dates):
         msg['From'] = sender_email
         msg['To'] = recipient_email
         
-        # Create plain text and HTML versions
+        # Create plain text and HTML versions (include event link if available)
         text = "New US tour dates have been found!\n\n"
-        html = "<html><body><h2>🎵 New US Tour Dates!</h2><table border='1'><tr><th>Date</th><th>City</th><th>Venue</th></tr>"
-        
+        html = "<html><body><h2>🎵 New US Tour Dates!</h2><table border='1'><tr><th>Date</th><th>City</th><th>Venue</th><th>Link</th></tr>"
+
         for date_info in new_dates:
-            text += f"- {date_info['date']}: {date_info['city']} at {date_info['venue']}\n"
-            html += f"<tr><td>{date_info['date']}</td><td>{date_info['city']}</td><td>{date_info['venue']}</td></tr>"
-        
+            link = date_info.get('link') or ''
+            text += f"- {date_info['date']}: {date_info['city']} at {date_info['venue']} {link}\n"
+            if link:
+                html += f"<tr><td>{date_info['date']}</td><td>{date_info['city']}</td><td>{date_info['venue']}</td><td><a href=\"{link}\">Link</a></td></tr>"
+            else:
+                html += f"<tr><td>{date_info['date']}</td><td>{date_info['city']}</td><td>{date_info['venue']}</td><td></td></tr>"
+
         html += "</table></body></html>"
         
         # Attach both versions
@@ -362,6 +380,18 @@ def main():
     # Save all scraped events so you can verify scraping in seen_dates.json
     save_all_events(all_events)
 
+    # TESTING: if FORCE_SEND_FIRST is set, send the first event found (useful for GitHub Actions tests)
+    if os.getenv('FORCE_SEND_FIRST') == '1':
+        if all_events:
+            print('DEBUG: FORCE_SEND_FIRST enabled — sending first event via email')
+            try:
+                send_email_notification([all_events[0]])
+            except Exception as e:
+                print(f"Error sending forced test email: {e}")
+        else:
+            print('DEBUG: FORCE_SEND_FIRST enabled but no events found')
+        return
+
     # Filter US events from the full list
     current_dates = [e for e in all_events if is_us_location_by_postal_code(e.get('address', ''))]
     print(f"Found {len(current_dates)} US dates on website")
@@ -370,8 +400,8 @@ def main():
     seen_dates = load_seen_dates()
     
     # Step 4: Find NEW dates (not in the seen list)
-    # We compare by creating a unique string from date, city, venue, and address
-    current_date_strings = [f"{d['date']}_{d['city']}_{d['venue']}_{d['address']}" for d in current_dates]
+    # We compare by creating a unique string from date, city, venue, address and link
+    current_date_strings = [f"{d['date']}_{d['city']}_{d['venue']}_{d.get('address','')}_{d.get('link','')}" for d in current_dates]
     new_date_strings = [d for d in current_date_strings if d not in seen_dates]
     
     if new_date_strings:
