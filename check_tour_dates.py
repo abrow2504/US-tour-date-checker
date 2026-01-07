@@ -88,6 +88,60 @@ def extract_us_dates(html_content):
     return us_dates
 
 
+def extract_all_events(html_content):
+    """
+    Parse the HTML and extract all tour events (no country filtering).
+
+    Returns:
+        list: A list of tour event dictionaries with keys: 'date', 'city', 'venue', 'address'
+    """
+    soup = BeautifulSoup(html_content, 'html.parser')
+    events_out = []
+
+    # Find all event cards - they're in elements with class 'card-date-reveal' or inside 'text-container'
+    events = soup.find_all('div', class_='card-date-reveal')
+    if not events:
+        events = soup.find_all('div', class_='text-container')
+
+    # Find dialog address if present
+    dialog = soup.find('dialog', {'data-modal': 'date-infos'})
+    dialog_address = None
+    if dialog:
+        addr_el = dialog.find('a', class_='address')
+        dialog_address = addr_el.get_text(strip=True) if addr_el else None
+
+    for event in events:
+        try:
+            date_text = event.find('span', class_='date')
+            city_text = event.find('span', class_='city')
+            venue_text = event.find('span', class_='venue')
+
+            # Try to locate an address near this event; fallback to dialog address if present
+            address_text = None
+            # search for an address link inside parent or nearby elements
+            parent = event.find_parent()
+            if parent:
+                addr = parent.find('a', class_='address')
+                if addr:
+                    address_text = addr.get_text(strip=True)
+
+            if not address_text and dialog_address:
+                address_text = dialog_address
+
+            if date_text and city_text:
+                events_out.append({
+                    'date': date_text.get_text(strip=True),
+                    'city': city_text.get_text(strip=True),
+                    'venue': venue_text.get_text(strip=True) if venue_text else 'TBA',
+                    'address': address_text or ''
+                })
+        except Exception as e:
+            print(f"Error parsing event for all-events: {e}")
+            continue
+
+    return events_out
+
+
 def is_us_location_by_postal_code(address_text):
     """
     Detect if an address is in the US by looking for US postal code format.
@@ -157,6 +211,30 @@ def save_seen_dates(dates):
         print(f"Error saving seen dates: {e}")
 
 
+def save_all_events(events):
+    """
+    Save the full list of scraped events to the same JSON state file under key `all_events`.
+    This helps verify scraping while keeping existing `dates` behavior intact.
+    """
+    state_file = 'seen_dates.json'
+    data = {}
+    try:
+        if os.path.exists(state_file):
+            with open(state_file, 'r') as f:
+                data = json.load(f)
+    except Exception:
+        data = {}
+
+    data['all_events'] = events
+    data['last_scan'] = datetime.now().isoformat()
+
+    try:
+        with open(state_file, 'w', encoding='utf-8') as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        print(f"Error saving all events: {e}")
+
+
 def send_email_notification(new_dates):
     """
     Send an email notification with the new US tour dates.
@@ -217,8 +295,15 @@ def main():
         print("Failed to fetch website. Exiting.")
         return
     
-    # Step 2: Extract US dates
-    current_dates = extract_us_dates(html)
+    # Step 2: Extract all events (for verification) and then filter US dates
+    all_events = extract_all_events(html)
+    print(f"Found {len(all_events)} total events on website")
+
+    # Save all scraped events so you can verify scraping in seen_dates.json
+    save_all_events(all_events)
+
+    # Filter US events from the full list
+    current_dates = [e for e in all_events if is_us_location_by_postal_code(e.get('address', ''))]
     print(f"Found {len(current_dates)} US dates on website")
     
     # Step 3: Load previously seen dates
