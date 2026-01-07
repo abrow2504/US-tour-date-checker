@@ -43,6 +43,10 @@ jobs:
           EMAIL_ADDRESS: ${{ secrets.EMAIL_ADDRESS }}
           EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
           RECIPIENT_EMAIL: ${{ secrets.RECIPIENT_EMAIL }}
+          # Optional notification integrations (set in repo Secrets if you want these enabled)
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          SMS_RECIPIENT_ADDRESS: ${{ secrets.SMS_RECIPIENT_ADDRESS }}
           FORCE_SEND_FIRST: ${{ secrets.FORCE_SEND_FIRST }}
         run: python check_tour_dates.py
       

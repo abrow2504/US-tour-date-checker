@@ -53,6 +53,14 @@ GitHub "Secrets" are like secure environment variables - they're encrypted and o
 | `EMAIL_PASSWORD` | The 16-character App Password from Step 1 |
 | `RECIPIENT_EMAIL` | The email where you want notifications (can be the same as EMAIL_ADDRESS) |
 
+You can optionally add these additional secrets to enable SMS and Telegram notifications:
+
+| Name | Value / Notes |
+|------|---------------|
+| `TELEGRAM_BOT_TOKEN` | Token from BotFather when you create a Telegram bot |
+| `TELEGRAM_CHAT_ID` | Your chat ID (see instructions below) |
+| `SMS_RECIPIENT_ADDRESS` | An email-to-SMS gateway address, e.g. `5551234567@txt.att.net` |
+
 ### Step 4: Verify the Workflow File
 
 The workflow file (`.github/workflows/check-tour-dates.yml`) is already in the repo. It tells GitHub to:
@@ -69,6 +77,25 @@ The workflow file (`.github/workflows/check-tour-dates.yml`) is already in the r
 4. Click **Run workflow** → **Run workflow**
 5. Wait 30 seconds and refresh - you should see it running (blue dot = in progress, green checkmark = success)
 6. You should receive a test email!
+
+If you added `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID`, the workflow will also attempt to send a Telegram message when new dates are found.
+
+If you added `SMS_RECIPIENT_ADDRESS`, the workflow will attempt to send a short SMS via the carrier's email-to-SMS gateway. Carrier gateways differ — a few examples:
+
+- AT&T: `NUMBER@txt.att.net`
+- T-Mobile: `NUMBER@tmomail.net`
+- Verizon: `NUMBER@vtext.com`
+
+Notes on getting Telegram credentials:
+
+1. In Telegram, start a chat with the user `@BotFather` and follow instructions to create a new bot. BotFather will give you a `BOT_TOKEN`.
+2. To get your `CHAT_ID`, you can message your bot and then visit `https://api.telegram.org/bot<YOUR_BOT_TOKEN>/getUpdates` in a browser (replace `<YOUR_BOT_TOKEN>`). The response will include your chat id. Alternatively, add the bot to a group and use the same method to find the group's chat id.
+
+Notes on SMS and Google Voice:
+
+- The script only supports sending SMS via carrier email-to-SMS gateways (which are free). Google Voice does not provide a supported free HTTP API for sending SMS; automating Google Voice via browser automation is brittle and may violate their terms of service.
+
+Security reminder: keep repository secrets private. Do not commit API tokens or phone numbers into source files.
 
 ---
 

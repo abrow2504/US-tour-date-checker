@@ -349,6 +349,78 @@ def send_email_notification(new_dates):
         print(f"Error sending email: {e}")
 
 
+def send_sms_via_email(new_dates):
+    """
+    Send a short SMS via the carrier's email-to-SMS gateway.
+    Requires env var `SMS_RECIPIENT_ADDRESS` (e.g. 5551234567@txt.att.net)
+    Uses the same SMTP credentials as email notifications.
+    """
+    sms_to = os.getenv('SMS_RECIPIENT_ADDRESS')
+    sender_email = os.getenv('EMAIL_ADDRESS')
+    sender_password = os.getenv('EMAIL_PASSWORD')
+
+    if not sms_to:
+        print('DEBUG: SMS_RECIPIENT_ADDRESS not set; skipping SMS via email')
+        return
+    if not all([sender_email, sender_password]):
+        print('DEBUG: SMTP credentials not set; cannot send SMS via email')
+        return
+
+    # Build a short message (carrier limits apply ~160 chars)
+    lines = []
+    for d in new_dates:
+        lines.append(f"{d['date']} {d['city']} {d['venue']}")
+    body = "New US tour dates: " + "; ".join(lines)
+    # Truncate to 150 chars to be safe
+    body = body[:150]
+
+    try:
+        msg = MIMEText(body)
+        msg['Subject'] = ''
+        msg['From'] = sender_email
+        msg['To'] = sms_to
+
+        with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
+            server.login(sender_email, sender_password)
+            server.sendmail(sender_email, [sms_to], msg.as_string())
+
+        print(f"✅ SMS via email sent to {sms_to}")
+    except Exception as e:
+        print(f"Error sending SMS via email: {e}")
+
+
+def send_telegram_notification(new_dates):
+    """
+    Send a Telegram message to a chat using a bot.
+    Requires `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID` env vars.
+    """
+    bot_token = os.getenv('TELEGRAM_BOT_TOKEN')
+    chat_id = os.getenv('TELEGRAM_CHAT_ID')
+
+    if not all([bot_token, chat_id]):
+        print('DEBUG: Telegram env vars not set; skipping Telegram notification')
+        return
+
+    lines = []
+    for d in new_dates:
+        link = d.get('link') or os.getenv('SITE_URL', 'https://apaintedsymphony.expedition33.com/')
+        lines.append(f"{d['date']}: {d['city']} at {d['venue']} — {link}")
+
+    text = "🎵 New US tour dates!\n" + "\n".join(lines)
+
+    url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
+    payload = {'chat_id': chat_id, 'text': text}
+
+    try:
+        r = requests.post(url, data=payload, timeout=10)
+        if r.status_code == 200:
+            print('✅ Telegram notification sent')
+        else:
+            print(f'Error sending Telegram message: HTTP {r.status_code} {r.text}')
+    except Exception as e:
+        print(f'Error sending Telegram message: {e}')
+
+
 def main():
     """Main function - orchestrates the entire check process."""
     print(f"[{datetime.now()}] Starting tour date check...")
@@ -415,6 +487,15 @@ def main():
         
         # Send notification
         send_email_notification(new_dates)
+        # Optional: also send SMS via carrier gateway and Telegram
+        try:
+            send_sms_via_email(new_dates)
+        except Exception as e:
+            print(f"Error in SMS notification: {e}")
+        try:
+            send_telegram_notification(new_dates)
+        except Exception as e:
+            print(f"Error in Telegram notification: {e}")
     else:
         print("No new US dates found.")
     
