@@ -28,6 +28,7 @@ def fetch_website():
         }
         response = requests.get(url, headers=headers, timeout=10)
         response.raise_for_status()  # Raise an error if the request failed
+        print(f"DEBUG: Fetched {len(response.text)} characters from website")
         return response.text
     except requests.RequestException as e:
         print(f"Error fetching website: {e}")
@@ -60,13 +61,33 @@ def extract_all_events(html_content):
     soup = BeautifulSoup(html_content, 'html.parser')
     events_out = []
 
-    # Find all event cards by the actual class name
-    events = soup.find_all('div', class_='card-date')
-    print(f"DEBUG: Found {len(events)} elements with class 'card-date'")
+    # Find all event cards by the actual class name using CSS selector
+    # This is more reliable than find_all() for complex selectors
+    events = soup.select('div.card-date')
+    print(f"DEBUG: Found {len(events)} elements with CSS selector 'div.card-date'")
     
     # Debug: print first event if found
     if events:
-        print(f"DEBUG: First event HTML: {str(events[0])[:200]}...")
+        print(f"DEBUG: First event HTML snippet: {str(events[0])[:300]}...")
+    else:
+        # Try alternate selectors to debug
+        print(f"DEBUG: Trying alternate selectors...")
+        alt1 = soup.find_all('div', class_='card-date')
+        print(f"DEBUG: find_all with class_='card-date': {len(alt1)} elements")
+        
+        alt2 = soup.select('[class*="card-date"]')
+        print(f"DEBUG: CSS selector with class*=card-date: {len(alt2)} elements")
+        
+        # Check if there are any divs at all
+        all_divs = soup.find_all('div')
+        print(f"DEBUG: Total divs in page: {len(all_divs)}")
+        
+        # Sample a few div classes
+        sample_classes = []
+        for div in all_divs[:10]:
+            if div.get('class'):
+                sample_classes.append(div.get('class'))
+        print(f"DEBUG: Sample of div classes: {sample_classes}")
 
     for idx, event in enumerate(events):
         try:
@@ -284,6 +305,22 @@ def main():
     if not html:
         print("Failed to fetch website. Exiting.")
         return
+    
+    # DEBUG: Save HTML to file for inspection
+    with open('debug_html.txt', 'w', encoding='utf-8') as f:
+        f.write(html)
+    print("DEBUG: Saved HTML to debug_html.txt for inspection")
+    
+    # Check if the HTML contains expected content
+    if 'card-date' in html:
+        print("DEBUG: Found 'card-date' in HTML")
+    else:
+        print("DEBUG: 'card-date' NOT found in HTML - page may be JavaScript-rendered!")
+    
+    if 'dates-list' in html:
+        print("DEBUG: Found 'dates-list' in HTML")
+    else:
+        print("DEBUG: 'dates-list' NOT found in HTML")
     
     # Step 2: Extract all events (for verification) and then filter US dates
     all_events = extract_all_events(html)
