@@ -184,29 +184,33 @@ def extract_all_events(html_content):
 
 def is_us_location_by_postal_code(address_text):
     """
-    Detect if an address is in the US by looking for US postal code format.
+    Detect if an address is in the US by looking for the US postal code format:
+    State abbreviation (2 capital letters) followed by 5-digit ZIP code.
     
-    US postal codes are distinctive:
-    - 5 digits (e.g., "10001" for New York)
-    - 5 digits + 4 (e.g., "10001-1234" for extended format)
+    Examples:
+    - "New York, NY 10001" → matches (state abbr + ZIP)
+    - "Los Angeles, CA 90210" → matches
+    - "1 Pl. Saint-Nazaire, 11000 Carcassonne" → does NOT match (just 5 digits, no state)
     
-    This is more reliable than checking city names because:
-    - It's based on a standardized format
-    - It works even if new European cities are added
-    - Postal codes are unique and unambiguous
+    This distinguishes US addresses from European ones, which just have postal codes
+    without state abbreviations.
     
     Args:
-        address_text (str): The full address string (e.g., "123 Main St, New York, NY 10001")
+        address_text (str): The full address string
         
     Returns:
-        bool: True if the address contains a US postal code pattern
+        bool: True if the address contains a US state + ZIP code pattern
     """
-    # Regex pattern for US postal codes: 5 digits or 5 digits-4 digits
-    # The pattern looks for: digit digit digit digit digit (optional: dash digit digit digit digit)
-    us_zip_pattern = r'\b\d{5}(?:-\d{4})?\b'
+    # Pattern: space/comma, then 2 uppercase letters (state), space, then 5 digits (ZIP)
+    # Examples: "NY 10001", "CA 90210-1234", "Texas TX 12345"
+    us_pattern = r'[,\s]([A-Z]{2})\s+\d{5}(?:-\d{4})?'
     
     # Search for the pattern in the address
-    if re.search(us_zip_pattern, address_text):
+    match = re.search(us_pattern, address_text)
+    
+    if match:
+        state_abbr = match.group(1)
+        print(f"DEBUG: Found US postal pattern with state '{state_abbr}' in address: {address_text}")
         return True
     
     return False
