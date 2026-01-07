@@ -62,17 +62,24 @@ def extract_all_events(html_content):
 
     # Find all event cards by the actual class name
     events = soup.find_all('div', class_='card-date')
+    print(f"DEBUG: Found {len(events)} elements with class 'card-date'")
+    
+    # Debug: print first event if found
+    if events:
+        print(f"DEBUG: First event HTML: {str(events[0])[:200]}...")
 
-    for event in events:
+    for idx, event in enumerate(events):
         try:
             # Find the text container with event details
             text_container = event.find('div', class_='text-container')
             if not text_container:
+                print(f"DEBUG: Event {idx} has no text-container")
                 continue
 
             # Get date and venue from top-info
             top_info = text_container.find('div', class_='top-info')
             if not top_info:
+                print(f"DEBUG: Event {idx} has no top-info")
                 continue
             
             date_elem = top_info.find('span', class_='date')
@@ -85,6 +92,7 @@ def extract_all_events(html_content):
                 city_elem = middle_info.find('div', class_='city')
 
             if not date_elem or not city_elem:
+                print(f"DEBUG: Event {idx} missing date or city")
                 continue
 
             # Extract date and city
@@ -105,7 +113,7 @@ def extract_all_events(html_content):
                         event_info = json.loads(decoded_data)
                         address_text = event_info.get('address', '')
                     except Exception as e:
-                        print(f"Error decoding event info: {e}")
+                        print(f"Error decoding event info for event {idx}: {e}")
                         address_text = ''
 
             # Create event dictionary
@@ -115,9 +123,10 @@ def extract_all_events(html_content):
                 'venue': venue_text,
                 'address': address_text
             })
+            print(f"DEBUG: Extracted event {idx}: {city_text} on {date_text}")
 
         except Exception as e:
-            print(f"Error parsing event: {e}")
+            print(f"Error parsing event {idx}: {e}")
             continue
 
     return events_out
