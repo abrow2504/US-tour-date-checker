@@ -1,19 +1,47 @@
 # Tour Date Checker Setup Guide
 
-This script automatically checks for new US concert tour dates and sends you an email notification.
+This script automatically checks for new concert tour dates and sends you notifications via email, SMS, and Telegram.
 
 ## How It Works (The Big Picture)
 
-1. **Python Script** - Visits the concert website, extracts dates, detects NEW US dates
-2. **Email Notification** - Sends you an email when new dates are found
-3. **GitHub Actions** - Runs your script every 10 minutes, completely free, no server needed
-4. **State Tracking** - Remembers which dates you've already been notified about
+1. **Configuration File** - Define your target website and CSS selectors in `config.json`
+2. **Python Script** - Visits the website, extracts events, detects NEW dates
+3. **Notifications** - Sends you alerts via Email, SMS, and/or Telegram when new dates are found
+4. **GitHub Actions** - Runs your script automatically (every hour by default), completely free
+5. **State Tracking** - Remembers which dates you've already been notified about
 
 It's similar to a Power Automate workflow, but running on GitHub's servers instead of Microsoft's.
 
 ---
 
 ## Setup Steps
+
+### Step 0: Configure Your Target Website
+
+**This is the most important step!** The script needs to know how to parse your specific website.
+
+1. **Copy the example config:**
+   ```bash
+   cp config.example.json config.json
+   ```
+
+2. **Edit `config.json`** with your website details:
+   - `site.url` - The website URL to monitor
+   - `site.name` - A friendly name for your site
+   - `scraping.selectors` - CSS selectors that match your website's HTML structure
+
+3. **Find CSS selectors** (see detailed guide in README.md):
+   - Right-click on an event on the website → Inspect
+   - Find the class names for: event cards, dates, cities, venues
+   - Update the selectors in `config.json`
+
+4. **Test your config locally:**
+   ```bash
+   python check_tour_dates.py
+   ```
+   Check `debug_html.txt` and `seen_dates.json` to verify it's working.
+
+For detailed configuration instructions, see the [README.md](README.md).
 
 ### Step 1: Set Up Gmail (Your Email Sender)
 

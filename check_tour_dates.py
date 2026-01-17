@@ -16,16 +16,46 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.chrome.options import Options
+# Global configuration
+CONFIG = None
 
+def load_config(config_path='config.json'):
+    """
+    Load configuration from JSON file.
+    
+    Args:
+        config_path (str): Path to the configuration file
+        
+    Returns:
+        dict: Configuration dictionary
+    """
+    global CONFIG
+    
+    if not os.path.exists(config_path):
+        print(f"Error: Configuration file '{config_path}' not found!")
+        print("Please copy 'config.example.json' to 'config.json' and customize it.")
+        exit(1)
+    
+    try:
+        with open(config_path, 'r', encoding='utf-8') as f:
+            CONFIG = json.load(f)
+            print(f"Loaded configuration for: {CONFIG['site']['name']}")
+            return CONFIG
+    except Exception as e:
+        print(f"Error loading config file: {e}")
+        exit(1)
 
 def fetch_website():
     """
     Fetch the concert website using Selenium (headless browser) to render JavaScript.
+    Uses configuration to determine URL and wait conditions.
     
     Returns:
         str: The HTML content of the webpage after JavaScript is executed, or None if request fails
     """
-    url = "https://apaintedsymphony.expedition33.com/"
+    url = CONFIG['site']['url']
+    wait_element = CONFIG['scraping']['wait_for_element']
+    wait_timeout = CONFIG['scraping'].get('wait_timeout', 10)
     
     try:
         # Set up Chrome options for headless mode
@@ -41,12 +71,24 @@ def fetch_website():
         print(f"DEBUG: Fetching {url} with Selenium...")
         driver.get(url)
         
-        # Wait for the dates list to load (max 10 seconds)
-        print("DEBUG: Waiting for dates to load...")
-        WebDriverWait(driver, 10).until(
-            EC.presence_of_all_elements_located((By.CLASS_NAME, "card-date"))
+        # Wait for the configured element to load
+        print(f"DEBUG: Waiting for element ({wait_element['type']}: {wait_element['value']})...")
+        
+        # Map config type to Selenium By type
+        by_type_map = {
+            'class_name': By.CLASS_NAME,
+            'id': By.ID,
+            'css': By.CSS_SELECTOR,
+            'xpath': By.XPATH,
+            'tag_name': By.TAG_NAME
+        }
+        
+        by_type = by_type_map.get(wait_element['type'], By.CLASS_NAME)
+        
+        WebDriverWait(driver, wait_timeout).until(
+            EC.presence_of_all_elements_located((by_type, wait_element['value']))
         )
-        print("DEBUG: Dates loaded!")
+        print("DEBUG: Elements loaded!")
         
         # Get the rendered HTML
         html = driver.page_source
@@ -80,20 +122,19 @@ def extract_us_dates(html_content):
 def extract_all_events(html_content):
     """
     Parse the HTML and extract all tour events (no country filtering).
-    
-    The address data is stored in a data-infos attribute as URL-encoded JSON.
-    We decode and parse it to get the full event details.
+    Uses configuration to determine CSS selectors and data extraction logic.
 
     Returns:
         list: A list of tour event dictionaries with keys: 'date', 'city', 'venue', 'address'
     """
     soup = BeautifulSoup(html_content, 'html.parser')
     events_out = []
+    
+    selectors = CONFIG['scraping']['selectors']
 
-    # Find all event cards by the actual class name using CSS selector
-    # This is more reliable than find_all() for complex selectors
-    events = soup.select('div.card-date')
-    print(f"DEBUG: Found {len(events)} elements with CSS selector 'div.card-date'")
+    # Find all event cards using configured selector
+    events = soup.select(selectors['event_cards'])
+    print(f"DEBUG: Found {len(events)} elements with CSS selector '{selectors['event_cards']}'")
     
     # Debug: print first event if found
     if events:
@@ -121,25 +162,25 @@ def extract_all_events(html_content):
     for idx, event in enumerate(events):
         try:
             # Find the text container with event details
-            text_container = event.find('div', class_='text-container')
+            text_container = event.select_one(selectors.get('text_container', 'div.text-container'))
             if not text_container:
                 print(f"DEBUG: Event {idx} has no text-container")
                 continue
 
             # Get date and venue from top-info
-            top_info = text_container.find('div', class_='top-info')
+            top_info = text_container.select_one(selectors.get('top_info', 'div.top-info'))
             if not top_info:
                 print(f"DEBUG: Event {idx} has no top-info")
                 continue
             
-            date_elem = top_info.find('span', class_='date')
-            venue_elem = top_info.find('span', class_='venue')
+            date_elem = top_info.select_one(selectors.get('date_element', 'span.date'))
+            venue_elem = top_info.select_one(selectors.get('venue_element', 'span.venue'))
             
             # Get city from middle-info
-            middle_info = text_container.find('div', class_='middle-info')
+            middle_info = text_container.select_one(selectors.get('middle_info', 'div.middle-info'))
             city_elem = None
             if middle_info:
-                city_elem = middle_info.find('div', class_='city')
+                city_elem = middle_info.select_one(selectors.get('city_element', 'div.city'))
 
             if not date_elem or not city_elem:
                 print(f"DEBUG: Event {idx} missing date or city")
@@ -153,18 +194,21 @@ def extract_all_events(html_content):
             # Get address and link from the data-infos attribute on the "More info" button
             address_text = ''
             link_text = ''
-            bottom_infos = text_container.find('div', class_='bottom-infos')
+            bottom_infos = text_container.select_one(selectors.get('bottom_info', 'div.bottom-infos'))
             if bottom_infos:
                 # try to find a direct tickets link first
-                tickets_a = bottom_infos.find('a', class_='btn')
+                tickets_a = bottom_infos.select_one(selectors.get('tickets_button', 'a.btn'))
                 if tickets_a and tickets_a.has_attr('href'):
                     link_text = tickets_a['href']
 
-                more_info_btn = bottom_infos.find('button', {'data-open-modal': 'date-infos'})
-                if more_info_btn and more_info_btn.has_attr('data-infos'):
+                more_info_selector = selectors.get('more_info_button', "button[data-open-modal='date-infos']")
+                data_attr = selectors.get('data_attribute', 'data-infos')
+                more_info_btn = bottom_infos.select_one(more_info_selector)
+                
+                if more_info_btn and more_info_btn.has_attr(data_attr):
                     try:
                         # Decode the URL-encoded JSON
-                        encoded_data = more_info_btn['data-infos']
+                        encoded_data = more_info_btn[data_attr]
                         decoded_data = urllib.parse.unquote(encoded_data)
                         event_info = json.loads(decoded_data)
                         address_text = event_info.get('address', '')
@@ -175,7 +219,7 @@ def extract_all_events(html_content):
                         address_text = ''
                 else:
                     # fallback: look for primary ticket anchor
-                    a_primary = bottom_infos.find('a', class_='btn primary')
+                    a_primary = bottom_infos.select_one('a.btn.primary')
                     if a_primary and a_primary.has_attr('href'):
                         link_text = a_primary['href']
 
@@ -293,7 +337,7 @@ def load_seen_dates():
     Returns:
         list: List of previously seen date strings
     """
-    state_file = 'seen_dates.json'
+    state_file = CONFIG.get('state_file', 'seen_dates.json')
     
     if os.path.exists(state_file):
         try:
@@ -315,7 +359,7 @@ def save_seen_dates(dates):
     Args:
         dates (list): List of tour date strings to save
     """
-    state_file = 'seen_dates.json'
+    state_file = CONFIG.get('state_file', 'seen_dates.json')
     
     try:
         with open(state_file, 'w') as f:
@@ -329,7 +373,7 @@ def save_all_events(events):
     Save the full list of scraped events to the same JSON state file under key `all_events`.
     This helps verify scraping while keeping existing `dates` behavior intact.
     """
-    state_file = 'seen_dates.json'
+    state_file = CONFIG.get('state_file', 'seen_dates.json')
     data = {}
     try:
         if os.path.exists(state_file):
@@ -350,11 +394,16 @@ def save_all_events(events):
 
 def send_email_notification(new_dates):
     """
-    Send an email notification with the new US tour dates.
+    Send an email notification with the new tour dates.
     
     Args:
         new_dates (list): List of new tour date dictionaries
     """
+    # Check if email notifications are enabled
+    if not CONFIG['notifications']['email'].get('enabled', True):
+        print("Email notifications are disabled in config")
+        return
+    
     # Get credentials from environment variables (more secure than hardcoding)
     sender_email = os.getenv('EMAIL_ADDRESS')
     sender_password = os.getenv('EMAIL_PASSWORD')
@@ -365,14 +414,18 @@ def send_email_notification(new_dates):
         return
     
     try:
-        # Create the email message
+        # Create the email message with configured subject
+        email_config = CONFIG['notifications']['email']
+        subject_prefix = email_config.get('subject_prefix', '🎵 NEW')
+        subject_suffix = email_config.get('subject_suffix', 'Tour Dates Found!')
+        
         msg = MIMEMultipart('alternative')
-        msg['Subject'] = "🎵 NEW US Tour Dates Found!"
+        msg['Subject'] = f"{subject_prefix} {subject_suffix}"
         msg['From'] = sender_email
         msg['To'] = recipient_email
         
-        # Base site URL fallback (can be overridden with env SITE_URL)
-        base_site = os.getenv('SITE_URL', 'https://apaintedsymphony.expedition33.com/')
+        # Base site URL from config
+        base_site = CONFIG['site']['url']
 
         # Create plain text and HTML versions (include event link if available)
         text = "New US tour dates have been found!\n\n"
@@ -410,6 +463,10 @@ def send_sms_via_email(new_dates):
     Requires env var `SMS_RECIPIENT_ADDRESS` (e.g. 5551234567@txt.att.net)
     Uses the same SMTP credentials as email notifications.
     """
+    if not CONFIG['notifications']['sms'].get('enabled', True):
+        print('DEBUG: SMS notifications are disabled in config')
+        return
+    
     sms_to = os.getenv('SMS_RECIPIENT_ADDRESS')
     sender_email = os.getenv('EMAIL_ADDRESS')
     sender_password = os.getenv('EMAIL_PASSWORD')
@@ -449,6 +506,10 @@ def send_telegram_notification(new_dates):
     Send a Telegram message to a chat using a bot.
     Requires `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID` env vars.
     """
+    if not CONFIG['notifications']['telegram'].get('enabled', True):
+        print('DEBUG: Telegram notifications are disabled in config')
+        return
+    
     bot_token = os.getenv('TELEGRAM_BOT_TOKEN')
     chat_id = os.getenv('TELEGRAM_CHAT_ID')
 
@@ -458,10 +519,10 @@ def send_telegram_notification(new_dates):
 
     lines = []
     for d in new_dates:
-        link = d.get('link') or os.getenv('SITE_URL', 'https://apaintedsymphony.expedition33.com/')
+        link = d.get('link') or CONFIG['site']['url']
         lines.append(f"{d['date']}: {d['city']} at {d['venue']} — {link}")
 
-    text = "🎵 New US tour dates!\n" + "\n".join(lines)
+    text = "🎵 New tour dates!\n" + "\n".join(lines)
 
     url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
     payload = {'chat_id': chat_id, 'text': text}
@@ -478,7 +539,10 @@ def send_telegram_notification(new_dates):
 
 def main():
     """Main function - orchestrates the entire check process."""
-    print(f"[{datetime.now()}] Starting tour date check...")
+    # Step 0: Load configuration
+    load_config()
+    
+    print(f"[{datetime.now()}] Starting tour date check for {CONFIG['site']['name']}...")
     
     # Step 1: Fetch the website
     html = fetch_website()
@@ -487,9 +551,10 @@ def main():
         return
     
     # DEBUG: Save HTML to file for inspection
-    with open('debug_html.txt', 'w', encoding='utf-8') as f:
+    debug_file = CONFIG.get('debug_html_file', 'debug_html.txt')
+    with open(debug_file, 'w', encoding='utf-8') as f:
         f.write(html)
-    print("DEBUG: Saved HTML to debug_html.txt for inspection")
+    print(f"DEBUG: Saved HTML to {debug_file} for inspection")
     
     # Check if the HTML contains expected content
     if 'card-date' in html:
@@ -529,9 +594,14 @@ def main():
             print('DEBUG: FORCE_SEND_FIRST enabled but no events found')
         return
 
-    # Filter US events from the full list
-    current_dates = [e for e in all_events if is_us_location_by_postal_code(e.get('address', ''))]
-    print(f"Found {len(current_dates)} US dates on website")
+    # Filter events based on config
+    if CONFIG['filtering']['enabled'] and CONFIG['filtering']['type'] == 'us_only':
+        current_dates = [e for e in all_events if is_us_location_by_postal_code(e.get('address', ''))]
+        print(f"Found {len(current_dates)} US dates on website")
+    else:
+        # No filtering, use all events
+        current_dates = all_events
+        print(f"Using all {len(current_dates)} dates (filtering disabled)")
     
     # Step 3: Load previously seen dates
     seen_dates = load_seen_dates()

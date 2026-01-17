@@ -1,0 +1,53 @@
+{
+  "site": {
+    "name": "A Painted Symphony Tour Dates",
+    "url": "https://apaintedsymphony.expedition33.com/",
+    "description": "Concert tour dates checker"
+  },
+  
+  "scraping": {
+    "method": "selenium",
+    "wait_for_element": {
+      "type": "class_name",
+      "value": "card-date"
+    },
+    "wait_timeout": 10,
+    "selectors": {
+      "event_cards": "div.card-date",
+      "text_container": "div.text-container",
+      "top_info": "div.top-info",
+      "date_element": "span.date",
+      "venue_element": "span.venue",
+      "middle_info": "div.middle-info",
+      "city_element": "div.city",
+      "bottom_info": "div.bottom-infos",
+      "tickets_button": "a.btn",
+      "more_info_button": "button[data-open-modal='date-infos']",
+      "data_attribute": "data-infos"
+    }
+  },
+  
+  "filtering": {
+    "enabled": true,
+    "type": "us_only",
+    "detection_method": "postal_code",
+    "custom_keywords": []
+  },
+  
+  "notifications": {
+    "email": {
+      "enabled": true,
+      "subject_prefix": "🎵 NEW",
+      "subject_suffix": "Tour Dates Found!"
+    },
+    "sms": {
+      "enabled": true
+    },
+    "telegram": {
+      "enabled": true
+    }
+  },
+  
+  "state_file": "seen_dates.json",
+  "debug_html_file": "debug_html.txt"
+}
