@@ -9,7 +9,7 @@ A highly configurable, reusable tool to monitor websites for new tour dates/even
 - **Flexible Filtering**: Built-in US location detection or use all events
 - **Multiple Notifications**: Email, SMS (via email gateway), and Telegram
 - **State Tracking**: Only notifies on genuinely new dates
-- **GitHub Actions**: Set up automated checks every hour
+- **GitHub Actions**: Set up automated checks every 10 minutes
 
 ## 🚀 Quick Start
 
@@ -104,10 +104,10 @@ Tell the scraper what element to wait for before parsing:
 {
   "scraping": {
     "wait_for_element": {
-      "type": "class_name",     // or "id", "css", "xpath", "tag_name"
-      "value": "event-item"      // the selector value
+      "type": "class_name", // or "id", "css", "xpath", "tag_name"
+      "value": "event-item" // the selector value
     },
-    "wait_timeout": 10           // seconds to wait
+    "wait_timeout": 10 // seconds to wait
   }
 }
 ```
@@ -120,20 +120,21 @@ Map the HTML structure of your target website:
 {
   "scraping": {
     "selectors": {
-      "event_cards": "div.event",           // Main container for each event
-      "text_container": "div.details",      // Container with event info
-      "date_element": "span.date",          // Date element
-      "city_element": "span.location",      // City/location element
-      "venue_element": "span.venue",        // Venue name element
-      "tickets_button": "a.tickets",        // Link to tickets
-      "more_info_button": "button.info",    // More info button (if any)
-      "data_attribute": "data-event-info"   // Data attribute name
+      "event_cards": "div.event", // Main container for each event
+      "text_container": "div.details", // Container with event info
+      "date_element": "span.date", // Date element
+      "city_element": "span.location", // City/location element
+      "venue_element": "span.venue", // Venue name element
+      "tickets_button": "a.tickets", // Link to tickets
+      "more_info_button": "button.info", // More info button (if any)
+      "data_attribute": "data-event-info" // Data attribute name
     }
   }
 }
 ```
 
 **Tips for finding selectors:**
+
 1. Right-click on an event on the website → "Inspect"
 2. Look for repeated elements (one per event)
 3. Note the class names and structure
@@ -146,8 +147,8 @@ Control which events trigger notifications:
 ```json
 {
   "filtering": {
-    "enabled": true,           // Set false to get all events
-    "type": "us_only",         // Currently only "us_only" or disable filtering
+    "enabled": true, // Set false to get all events
+    "type": "us_only", // Currently only "us_only" or disable filtering
     "detection_method": "postal_code"
   }
 }
@@ -191,6 +192,7 @@ Enable/disable each notification channel:
 4. **Note the classes/IDs** used
 
 Example HTML structure:
+
 ```html
 <div class="event-card">
   <div class="event-details">
@@ -202,6 +204,7 @@ Example HTML structure:
 ```
 
 Config for above:
+
 ```json
 {
   "event_cards": "div.event-card",
@@ -225,7 +228,11 @@ python check_tour_dates.py
 
 ## 🤖 Automated Checking (GitHub Actions)
 
-Set up hourly checks with GitHub Actions:
+Set up checks every 10 minutes with GitHub Actions:
+
+> **⚠️ Note on GitHub Actions Run Frequency**
+>
+> If you use GitHub Actions on a free or public repository, scheduled workflows (like this one) are not guaranteed to run exactly on time. GitHub may delay or skip runs due to server load, repository activity, or maintenance. This means your checks might sometimes run less frequently than scheduled (e.g., every 30–60 minutes instead of every 10). For critical or time-sensitive monitoring, consider running this script on your own server or a dedicated cloud scheduler.
 
 1. **Fork this repo**
 2. **Add repository secrets**:
@@ -234,7 +241,8 @@ Set up hourly checks with GitHub Actions:
 3. **The workflow runs automatically** (see `.github/workflows/check-dates.yml`)
 
 The GitHub Action:
-- Runs every hour (customizable)
+
+- Runs every 10 minutes (customizable)
 - Installs Chrome and dependencies
 - Executes the checker
 - Sends notifications when new dates are found
@@ -266,7 +274,7 @@ Set `SMS_RECIPIENT_ADDRESS=5551234567@txt.att.net`
 ## 🎯 Use Cases
 
 - **Concert Tours**: Track your favorite artists
-- **Conference Schedules**: Monitor tech conference announcements  
+- **Conference Schedules**: Monitor tech conference announcements
 - **Sports Events**: Follow game schedules
 - **Theater Shows**: Get notified about new performances
 - **Any Event Listing**: If it's on a website, you can track it!
@@ -294,6 +302,7 @@ Set `SMS_RECIPIENT_ADDRESS=5551234567@txt.att.net`
 ## 📝 Example Configs
 
 ### Bandsintown Artist Page
+
 ```json
 {
   "site": {
@@ -315,6 +324,7 @@ Set `SMS_RECIPIENT_ADDRESS=5551234567@txt.att.net`
 ```
 
 ### Custom Event Site
+
 ```json
 {
   "site": {
