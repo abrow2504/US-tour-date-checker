@@ -11,7 +11,17 @@ A highly configurable, reusable tool to monitor websites for new tour dates/even
 - **State Tracking**: Only notifies on genuinely new dates
 - **GitHub Actions**: Set up automated checks every 10 minutes
 
-## 🚀 Quick Start
+## � How It Works
+
+1. **Configuration File** - Define your target website and CSS selectors in `config.json`
+2. **Python Script** - Visits the website, extracts events, detects NEW dates
+3. **Notifications** - Sends you alerts via Email, SMS, and/or Telegram when new dates are found
+4. **GitHub Actions** - Runs your script automatically (every 10 minutes by default), completely free
+5. **State Tracking** - Remembers which dates you've already been notified about
+
+It's similar to a Power Automate workflow, but running on GitHub's servers instead of Microsoft's.
+
+## �🚀 Quick Start
 
 ### 1. Clone & Install
 
@@ -256,18 +266,54 @@ Set up checks every 10 minutes with GitHub Actions:
 >
 > If you use GitHub Actions on a free or public repository, scheduled workflows (like this one) are not guaranteed to run exactly on time. GitHub may delay or skip runs due to server load, repository activity, or maintenance. This means your checks might sometimes run less frequently than scheduled (e.g., every 30–60 minutes instead of every 10). For critical or time-sensitive monitoring, consider running this script on your own server or a dedicated cloud scheduler.
 
-1. **Fork this repo**
-2. **Add repository secrets**:
-   - Go to Settings → Secrets → Actions
-   - Add: `EMAIL_ADDRESS`, `EMAIL_PASSWORD`, `RECIPIENT_EMAIL`, etc.
-3. **The workflow runs automatically** (see `.github/workflows/check-dates.yml`)
+### Setting Up GitHub Actions
+
+1. **Fork this repo** to your GitHub account
+
+2. **Create initial state file**: Create `seen_dates.json` in your repository root:
+
+   ```json
+   {
+     "dates": [],
+     "last_updated": "2026-01-22T00:00:00"
+   }
+   ```
+
+3. **Add repository secrets**:
+   - Go to your repository on GitHub
+   - Click **Settings** → **Secrets and variables** → **Actions**
+   - Click **New repository secret** for each of the following:
+
+   **Required secrets:**
+   | Secret Name | Value | Notes |
+   |-------------|-------|-------|
+   | `EMAIL_ADDRESS` | `your-email@gmail.com` | Gmail address for sending notifications |
+   | `EMAIL_PASSWORD` | `your-app-password` | 16-character app password from Gmail (see Email Setup below) |
+   | `RECIPIENT_EMAIL` | `recipient@example.com` | Where to send notifications (can be same as EMAIL_ADDRESS) |
+
+   **Optional secrets:**
+   | Secret Name | Value | Notes |
+   |-------------|-------|-------|
+   | `SMS_RECIPIENT_ADDRESS` | `5551234567@txt.att.net` | Email-to-SMS gateway address (see SMS Setup below) |
+   | `TELEGRAM_BOT_TOKEN` | `123456:ABC-DEF...` | Token from BotFather |
+   | `TELEGRAM_CHAT_ID` | `123456789` | Your Telegram chat ID |
+
+4. **Test the workflow**:
+   - Go to the **Actions** tab in your repository
+   - Select **Check Tour Dates** workflow
+   - Click **Run workflow** → **Run workflow**
+   - Wait 30 seconds and refresh - you should see it running
+   - Check for notifications when it completes!
+
+5. **The workflow runs automatically** every 10 minutes (see `.github/workflows/check-dates.yml`)
 
 The GitHub Action:
 
-- Runs every 10 minutes (customizable)
-- Installs Chrome and dependencies
+- Runs every 10 minutes (customizable in the workflow file)
+- Installs Chrome and dependencies automatically
 - Executes the checker
 - Sends notifications when new dates are found
+- Commits updated `seen_dates.json` back to the repository
 
 ## 📧 Email Setup (Gmail)
 
@@ -366,6 +412,45 @@ Set `SMS_RECIPIENT_ADDRESS=5551234567@txt.att.net`
   }
 }
 ```
+
+## 🔬 How the Script Works (Technical Details)
+
+### Website Scraping
+
+```
+fetch_website() → downloads the HTML from the concert site
+extract_us_dates() → reads through the HTML and finds all events with "US" or state names
+```
+
+### New Date Detection
+
+```
+Load what we saw last time from seen_dates.json
+Compare it to what we see now
+If something is new → send a notification
+Save the current list for next time
+```
+
+This prevents duplicate notifications.
+
+### Notifications
+
+```
+Uses Gmail's SMTP server (SMTP = Simple Mail Transfer Protocol)
+Formats the email with HTML tables
+Sends to your configured channels (email, SMS, Telegram)
+```
+
+## 🎓 Key Concepts
+
+Working with this tool helps you learn:
+
+- **Web Scraping**: Downloading and parsing HTML to extract data
+- **State Management**: Remembering what happened last time so you don't repeat it
+- **Scheduled Automation**: Running code on a schedule without having your computer on
+- **Environment Variables**: Securely storing sensitive data (passwords) separate from code
+
+These are skills used everywhere in software development!
 
 ## 🤝 Contributing
 
