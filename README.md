@@ -21,6 +21,13 @@ cd US-tour-date-checker
 pip install -r requirements.txt
 ```
 
+## 📦 Requirements
+
+- Python 3.10+ with `pip`
+- Google Chrome (or Chromium) installed for Selenium to drive
+- Matching ChromeDriver/Chrome for local runs (handled automatically in GitHub Actions workflow)
+- Project dependencies from `requirements.txt` installed via `pip install -r requirements.txt`
+
 ### 2. Configure Your Target Website
 
 Copy the example config and customize it for your website:
@@ -77,6 +84,21 @@ TELEGRAM_CHAT_ID=your-chat-id
 ```bash
 python check_tour_dates.py
 ```
+
+## 🧪 Testing
+
+- Unit and end-to-end tests live under `tests/` and use `pytest`
+- Install dependencies (including pytest) with `pip install -r requirements.txt`
+- Run the full suite locally:
+
+```bash
+python -m pytest tests
+```
+
+Tips:
+
+- Tests mock network/email/Telegram interactions, so no secrets are required
+- Use `-k <pattern>` or `-q` flags with pytest to focus on specific modules or quiet the output
 
 ## 📋 Configuration Guide
 
