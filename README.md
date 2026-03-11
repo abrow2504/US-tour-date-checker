@@ -419,7 +419,8 @@ Set `SMS_RECIPIENT_ADDRESS=5551234567@txt.att.net`
 
 ```
 fetch_website() → downloads the HTML from the concert site
-extract_us_dates() → reads through the HTML and finds all events with "US" or state names
+extract_all_events() → reads through the HTML and finds all events
+apply_filtering() → filters events to US-only (or passes all through, based on config)
 ```
 
 ### New Date Detection
