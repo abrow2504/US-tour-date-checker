@@ -616,7 +616,7 @@ def main():
         print(f"🎉 Found {len(new_date_strings)} new US dates!")
         
         # Get the actual date details for the new ones
-        new_dates = [d for d in current_dates if f"{d['date']}_{d['city']}_{d['venue']}_{d['address']}" in new_date_strings]
+        new_dates = [d for d in current_dates if f"{d['date']}_{d['city']}_{d['venue']}_{d.get('address', '')}_{d.get('link', '')}" in new_date_strings]
         
         # Send notification
         send_email_notification(new_dates)
