@@ -39,13 +39,16 @@ def is_us_location_by_postal_code(address_text):
     """
     Detect if an address is in the US by looking for the US postal code format:
     State abbreviation (2 capital letters) followed by 5-digit ZIP code.
-    Falls back to checking for US state names/abbreviations if no postal code found.
+    Falls back to checking for a state abbreviation in standard US address format
+    (", NY" — comma-separated), which avoids false positives from European addresses
+    that contain matching 2-letter sequences (e.g. "Milano MI, Italie" or French "de").
 
     Examples:
-    - "New York, NY 10001" → True
+    - "New York, NY 10001" → True  (primary: state abbr + ZIP)
     - "Los Angeles, CA 90210" → True
-    - "New York, NY" → True (fallback: state abbreviation)
-    - "1 Pl. Saint-Nazaire, 11000 Carcassonne" → False (European address)
+    - "Nashville, TN" → True  (fallback: ", TN" comma-format)
+    - "Viale dell'Innovazione, Milano MI, Italie" → False
+    - "1 Pl. Saint-Nazaire, 11000 Carcassonne" → False
 
     Args:
         address_text (str): The full address string
@@ -53,22 +56,17 @@ def is_us_location_by_postal_code(address_text):
     Returns:
         bool: True if the address is identified as a US location
     """
-    # Primary: state abbreviation + ZIP code pattern, e.g. "NY 10001" or "CA 90210-1234"
-    us_pattern = r'[,\s]([A-Z]{2})\s+\d{5}(?:-\d{4})?'
-    match = re.search(us_pattern, address_text)
-    if match:
+    # Primary: state abbreviation + ZIP code, e.g. "NY 10001" or "CA 90210-1234"
+    us_zip_pattern = r'[,\s]([A-Z]{2})\s+\d{5}(?:-\d{4})?'
+    if re.search(us_zip_pattern, address_text):
         return True
 
-    # Fallback: check for state abbreviations or full state names
+    # Fallback: state abbreviation in standard US address comma-format ", NY"
+    # Requires a comma before the abbreviation to avoid matching abbreviations
+    # embedded in European city/country names.
     states_map = get_us_states_map()
-    address_upper = address_text.upper()
-
     for abbr in states_map['all_abbrs']:
-        if re.search(rf'\b{abbr}\b', address_upper):
-            return True
-
-    for name in states_map['all_names']:
-        if re.search(rf'\b{name.upper()}\b', address_upper):
+        if re.search(rf',\s*{abbr}\b', address_text.upper()):
             return True
 
     return False

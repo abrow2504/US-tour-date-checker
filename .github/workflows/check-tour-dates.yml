@@ -48,7 +48,7 @@ jobs:
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           SMS_RECIPIENT_ADDRESS: ${{ secrets.SMS_RECIPIENT_ADDRESS }}
           FORCE_SEND_FIRST: ${{ secrets.FORCE_SEND_FIRST }}
-        run: python check_tour_dates.py
+        run: python -m us_tour_checker.main
       
       # Step 5: Commit and push updated state file
       - name: Commit state changes
@@ -61,5 +61,7 @@ jobs:
           git remote set-url origin https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}
           git add seen_dates.json
           git commit -m "Update seen dates - $(date)" || echo "No changes to commit"
+          # Pull any commits made by concurrent runs before pushing
+          git pull --rebase origin ${{ github.ref_name }}
           # Push to the current branch
           git push origin HEAD:${{ github.ref_name }}
