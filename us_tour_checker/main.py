@@ -2,6 +2,7 @@ from us_tour_checker.config import load_config
 from us_tour_checker.scraper import fetch_website, extract_all_events
 from us_tour_checker.notifier import send_email_notification, send_telegram_notification
 from us_tour_checker.state import load_seen_dates, save_seen_dates, save_all_events
+from us_tour_checker.filter import apply_filtering
 
 from datetime import datetime
 import os
@@ -31,7 +32,9 @@ def main():
     all_events = extract_all_events(html, selectors)
     print(f"Found {len(all_events)} total events on website")
     save_all_events(all_events)
-    current_dates = all_events
+    current_dates = apply_filtering(all_events, config.get('filtering', {}))
+    if config.get('filtering', {}).get('enabled'):
+        print(f"After filtering: {len(current_dates)} events match filter '{config['filtering'].get('type')}'")
     seen_dates = load_seen_dates()
     current_date_strings = [_event_key(d) for d in current_dates]
     new_date_strings = [d for d in current_date_strings if d not in seen_dates]
